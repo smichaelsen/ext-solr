@@ -588,7 +588,9 @@ class RoutingService implements LoggerAwareInterface
         $result = [];
         foreach ($configuration['routeEnhancers'] as $routing => $settings) {
             // Not the page we are looking for
-            if (!in_array($pageUid, $settings['limitToPages'])) {
+            if (isset($settings['limitToPages']) &&
+                is_array($settings['limitToPages']) &&
+                !in_array($pageUid, $settings['limitToPages'])) {
                 continue;
             }
             // TODO: Instead of checking a string, check an interface (special interface for combined enhancer)
