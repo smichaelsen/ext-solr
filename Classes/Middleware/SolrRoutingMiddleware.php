@@ -154,14 +154,22 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
          * NOTE: TypoScript is not available at this point!
          */
         $uri = $request->getUri()->withPath(
-            $this->language->getBase()->getPath() .
-            (string)$page['slug']
+            $this->getRoutingService()->cleanupHeadingSlash(
+                $this->language->getBase()->getPath() .
+                (string)$page['slug']
+            )
         );
         $request = $request->withUri($uri);
         $queryParams = $request->getQueryParams();
 
         $queryParams = $this->getRoutingService()->unmaskQueryParameters($queryParams);
         $queryParams = $this->getRoutingService()->inflateQueryParameter($queryParams);
+
+        // @todo Drop cHash, but need to recalculate
+        if (array_key_exists('cHash', $queryParams)) {
+            unset($queryParams['cHash']);
+        }
+
         $request = $request->withQueryParams($queryParams);
 
         return $handler->handle($request);

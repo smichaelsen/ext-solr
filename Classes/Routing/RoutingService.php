@@ -619,6 +619,23 @@ class RoutingService implements LoggerAwareInterface
      * @param string $slug
      * @return string
      */
+    public function cleanupHeadingSlash(string $slug): string
+    {
+        if (mb_substr($slug, 0, 1) !== '/') {
+            return '/' . $slug;
+        } else if (mb_substr($slug, 0, 2) === '//') {
+            return mb_substr($slug, 1, mb_strlen($slug) - 1);
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Add heading slash to given slug
+     *
+     * @param string $slug
+     * @return string
+     */
     public function addHeadingSlash(string $slug): string
     {
         if (mb_substr($slug, 0, 1) === '/') {
