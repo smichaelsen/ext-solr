@@ -447,4 +447,52 @@ class RoutingServiceTest extends UnitTest
             $newRequest->getQueryParams()
         );
     }
+
+
+    /**
+     * @test
+     * @covers \ApacheSolrForTypo3\Solr\Routing\RoutingService::addPathArgumentsToQuery
+     */
+    public function testIfMultiplePathParametersAndMaskedParametersMovedInfoQueryParameters()
+    {
+        $uri = new Uri('http://domain.example/candy?taste=sweet,sour');
+        $request = new ServerRequest(
+            $uri
+        );
+        $request = $request->withQueryParams(['taste' => 'sweet,sour']);
+        $routingService = $this->getRoutingService();
+
+        $request = $routingService->addPathArgumentsToQuery(
+            $request,
+            [
+                'color' => 'filter-colorType'
+            ],
+            [
+                'color' => 'green,blue'
+            ]
+        );
+
+        $uri = $request->getUri()->withPath(
+            '/candy'
+        );
+        $request = $request->withUri($uri);
+        $queryParams = $request->getQueryParams();
+        $queryParams = $routingService->unmaskQueryParameters($queryParams);
+        $queryParams = $routingService->inflateQueryParameter($queryParams);
+        $request = $request->withQueryParams($queryParams);
+
+        $this->assertEquals(
+            [
+                'tx_solr' => [
+                    'filter' => [
+                        'taste:sweet',
+                        'taste:sour',
+                        'colorType:blue',
+                        'colorType:green'
+                    ]
+                ]
+            ],
+            $request->getQueryParams()
+        );
+    }
 }

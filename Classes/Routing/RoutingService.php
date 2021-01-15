@@ -205,10 +205,17 @@ class RoutingService implements LoggerAwareInterface
         }
 
         $newQueryParams = [];
-
         foreach ($queryParams as $queryParamName => $queryParamValue) {
+            // A merge is needed!
             if (!isset($queryParameterMapSwitched[$queryParamName])) {
-                $newQueryParams[$queryParamName] = $queryParamValue;
+                if (isset($newQueryParams[$queryParamName])) {
+                    $newQueryParams[$queryParamName] = array_merge_recursive(
+                        $newQueryParams[$queryParamName],
+                        $queryParamValue
+                    );
+                } else {
+                    $newQueryParams[$queryParamName] = $queryParamValue;
+                }
                 continue;
             }
             if (!isset($newQueryParams[$this->getPluginNamespace()])) {
