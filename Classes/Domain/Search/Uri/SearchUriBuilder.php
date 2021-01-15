@@ -306,7 +306,7 @@ class SearchUriBuilder
      * @return array
      */
     protected function getAdditionalArgumentsFromRequestConfiguration(SearchRequest $request)
-    {   
+    {
         if ($request->getContextTypoScriptConfiguration() == null) {
             return [];
         }
@@ -375,6 +375,7 @@ class SearchUriBuilder
 
         $routingConfigurations = $this->routingService
             ->fetchEnhancerByPageUid($pageUid);
+        $this->routingService = $this->routingService->withPathArguments($routingConfigurations[0]['_arguments']);
         $enhancedRouting = count($routingConfigurations) > 0;
         /* @var Uri $uri */
         $uri = GeneralUtility::makeInstance(
@@ -387,7 +388,7 @@ class SearchUriBuilder
         /* @var BeforeReplaceVariableInCachedUrlEvent $urlEvent */
         $urlEvent = $this->eventDispatcher->dispatch($urlEvent);
         $uriCacheTemplate = (string)$urlEvent->getUri();
-        
+
         $variableEvent = $enhancedRouting ?
             new BeforeProcessCachedEnhancedVariablesEvent(
                 $uri,
@@ -400,6 +401,7 @@ class SearchUriBuilder
 
         $keys = $variableEvent->getVariableKeys();
         $values = $variableEvent->getVariableValues();
+        $values = $this->routingService->reviseFilterVariables($values);
 
         $uri = str_replace($keys, $values, $uriCacheTemplate);
         $uri = GeneralUtility::makeInstance(

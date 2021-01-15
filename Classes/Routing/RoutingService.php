@@ -49,6 +49,13 @@ class RoutingService implements LoggerAwareInterface
     protected $settings = [];
 
     /**
+     * List of filter that are placed as path arguments
+     *
+     * @var array
+     */
+    protected $pathArguments = [];
+
+    /**
      * Plugin/extension namespace
      *
      * @var string
@@ -88,6 +95,19 @@ class RoutingService implements LoggerAwareInterface
     {
         $service = clone $this;
         $service->settings = $settings;
+        return $service;
+    }
+
+    /**
+     * Creates a clone of the current service and replace the settings inside
+     *
+     * @param array $pathArguments
+     * @return RoutingService
+     */
+    public function withPathArguments(array $pathArguments): RoutingService
+    {
+        $service = clone $this;
+        $service->pathArguments = $pathArguments;
         return $service;
     }
 
@@ -489,6 +509,33 @@ class RoutingService implements LoggerAwareInterface
     }
 
     /**
+     * Cleanup facet values (strip type if needed)
+     *
+     * @param array $facetValues
+     * @return array
+     */
+    public function cleanupFacetValues(array $facetValues): array
+    {
+        for ($i = 0; $i < count($facetValues); $i++) {
+            if (mb_strpos($facetValues[$i], ':') === false && mb_strpos($facetValues[$i], '%3A') === false) {
+                continue;
+            }
+
+            $separator = ':';
+            if (mb_strpos($facetValues[$i], '%3A') !== false) {
+                $separator = '%3A';
+            }
+            [$type, $value] = explode($separator, $facetValues[$i]);
+
+
+            if ($this->isMappingArgument($type) || $this->isPathArgument($type)) {
+                $facetValues[$i] = $value;
+            }
+        }
+        return $facetValues;
+    }
+
+    /**
      * Builds a string out of multiple facet values
      *
      * @param array $facets
@@ -496,6 +543,7 @@ class RoutingService implements LoggerAwareInterface
      */
     public function pathFacetsToString(array $facets): string
     {
+        $facets = $this->cleanupFacetValues($facets);
         sort($facets);
         for ($i = 0; $i < count($facets); $i++) {
             $facets[$i] = $this->encodeStringForPathSegment($facets[$i]);
@@ -511,6 +559,7 @@ class RoutingService implements LoggerAwareInterface
      */
     public function facetsToString(array $facets): string
     {
+        $facets = $this->cleanupFacetValues($facets);
         sort($facets);
         return implode($this->getFacetValueSeparator(), $facets);
     }
@@ -878,6 +927,90 @@ class RoutingService implements LoggerAwareInterface
         }
 
         return $request->withQueryParams($queryParams);
+    }
+
+    /**
+     * Check if given argument is a mapping argument
+     *
+     * @param string $facetName
+     * @return bool
+     */
+    public function isMappingArgument(string $facetName): bool
+    {
+        $map = $this->getQueryParameterMap();
+        if (isset($map[$facetName]) && $this->shouldMaskQueryParameter()) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Check if given facet type is an path argument
+     *
+     * @param string $facetName
+     * @return bool
+     */
+    public function isPathArgument(string $facetName): bool
+    {
+        return isset($this->pathArguments[$facetName]);
+    }
+
+    /**
+     * @param string $variable
+     * @return string
+     */
+    public function reviewVariable(string $variable): string
+    {
+        if (mb_strpos($variable, ':') === false && mb_strpos($variable, '%3A') === false) {
+            return $variable;
+        }
+
+        $separator = ':';
+        if (mb_strpos($variable, '%3A') !== false) {
+            $separator = '%3A';
+        }
+        [$type, $value] = explode($separator, $variable, 2);
+
+        return $this->isMappingArgument($type) ? $value : $variable;
+    }
+
+    /**
+     * Remove type prefix from filter
+     *
+     * @param array $variables
+     * @return array
+     */
+    public function reviseFilterVariables(array $variables): array
+    {
+        $newVariables = [];
+        foreach ($variables as $key => $value) {
+            $matches = [];
+            if (!preg_match('/###' . $this->getPluginNamespace() . ':filter:\d+:(.+?)###/', $key, $matches)) {
+                $newVariables[$key] = $value;
+                continue;
+            }
+
+            if (!$this->isMappingArgument($matches[1]) && !$this->isPathArgument($matches[1])) {
+                $newVariables[$key] = $value;
+                continue;
+            }
+            $separator = ':';
+            if (mb_strpos($value, '%3A') !== false) {
+                $separator = '%3A';
+            }
+            $parts = explode($separator, $value);
+
+            do {
+                if ($parts[0] === $matches[1]) {
+                    array_shift($parts);
+                }
+            } while ($parts[0] === $matches[1]);
+
+            $newVariables[$key] = implode($separator, $parts);
+        }
+
+        return $newVariables;
     }
 
     /**
