@@ -667,6 +667,45 @@ class RoutingService implements LoggerAwareInterface
     }
 
     /**
+     * @param SiteLanguage $language
+     * @param string $path
+     * @return bool
+     */
+    public function containsPathLanguageArgument(SiteLanguage $language, string $path): bool
+    {
+        if ($language->getBase()->getPath() === '/') {
+            return false;
+        }
+
+        $pathLength = mb_strlen($language->getBase()->getPath());
+        $languagePath = mb_substr($path, 0, $pathLength);
+        return $languagePath === $language->getBase()->getPath();
+    }
+
+    /**
+     * In order to search for a path, a possible language prefix need to remove
+     *
+     * @param SiteLanguage $language
+     * @param string $path
+     * @return string
+     */
+    public function stripLanguagePrefixFromPath(SiteLanguage $language, string $path): string
+    {
+        if ($language->getBase()->getPath() === '/') {
+            return $path;
+        }
+
+        $pathLength = mb_strlen($language->getBase()->getPath());
+
+        $path = mb_substr($path, $pathLength, mb_strlen($path) - $pathLength);
+        if (mb_substr($path, 0, 1) !== '/') {
+            $path = '/' . $path;
+        }
+
+        return $path;
+    }
+
+    /**
      * Returns the current language
      * @TODO Improvement required: Currently we expect that the longest length for base is at the end of the language array
      *       This may be incorrect and lead to wrong results.

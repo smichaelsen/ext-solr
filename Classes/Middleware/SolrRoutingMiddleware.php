@@ -213,14 +213,21 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
      */
     protected function getSlugAndParameters(UriInterface $uri, string $path, string $pageSlug): array
     {
-        if ($uri->getPath() === $pageSlug) {
+        // URI get path returns the path with given language parameter
+        // The parameter pageSlug itself does not contains the language parameter.
+        $uriPath = $this->routingService->stripLanguagePrefixFromPath(
+            $this->language,
+            $uri->getPath()
+        );
+
+        if ($uriPath === $pageSlug) {
             return [
                 $pageSlug,
                 []
             ];
         }
 
-        $uriElements = explode('/', $uri->getPath());
+        $uriElements = explode('/', $uriPath);
         $routeElements = explode('/', $path);
         $slugElements = [];
         $arguments = [];
@@ -345,7 +352,10 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
      */
     protected function retrievePageInformation(UriInterface $uri, Site $site): array
     {
-        $path = $this->stripLanguagePrefixFromPath($uri->getPath());
+        $path = $this->routingService->stripLanguagePrefixFromPath(
+            $this->language,
+            $uri->getPath()
+        );
         $slugProvider = $this->getSlugCandidateProvider($site);
         $scan = true;
         $page = [];
@@ -410,28 +420,6 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
             }
         } while($scan);
         return $page;
-    }
-
-    /**
-     * In order to search for a path, a possible language prefix need to remove
-     *
-     * @param string $path
-     * @return string
-     */
-    protected function stripLanguagePrefixFromPath(string $path): string
-    {
-        if ($this->language->getBase()->getPath() === '/') {
-            return $path;
-        }
-
-        $pathLength = mb_strlen($this->language->getBase()->getPath());
-
-        $path = mb_substr($path, $pathLength, mb_strlen($path) - $pathLength);
-        if (mb_substr($path, 0, 1) !== '/') {
-            $path = '/' . $path;
-        }
-
-        return $path;
     }
 
     /**
