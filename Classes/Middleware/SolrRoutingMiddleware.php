@@ -140,7 +140,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
          * Convert path arguments to query arguments
          */
         if (!empty($parameters)) {
-            $request = $this->routingService->addPathArgumentsToQuery(
+            $request = $this->getRoutingService()->addPathArgumentsToQuery(
                 $request,
                 $enhancerConfiguration['_arguments'],
                 $parameters
@@ -160,8 +160,8 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         $request = $request->withUri($uri);
         $queryParams = $request->getQueryParams();
 
-        $queryParams = $this->routingService->unmaskQueryParameters($queryParams);
-        $queryParams = $this->routingService->inflateQueryParameter($queryParams);
+        $queryParams = $this->getRoutingService()->unmaskQueryParameters($queryParams);
+        $queryParams = $this->getRoutingService()->inflateQueryParameter($queryParams);
         $request = $request->withQueryParams($queryParams);
 
         return $handler->handle($request);
@@ -178,6 +178,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         $this->namespace = isset($enhancerConfiguration['extensionKey']) ?
             $enhancerConfiguration['extensionKey'] :
             $this->namespace;
+        $this->routingService = null;
     }
 
     /**
@@ -213,7 +214,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
     {
         // URI get path returns the path with given language parameter
         // The parameter pageSlug itself does not contains the language parameter.
-        $uriPath = $this->routingService->stripLanguagePrefixFromPath(
+        $uriPath = $this->getRoutingService()->stripLanguagePrefixFromPath(
             $this->language,
             $uri->getPath()
         );
@@ -232,8 +233,8 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         }
 
         // Take care the format of configuration and given slug equals
-        $uriPath = $this->routingService->removeHeadingSlash($uriPath);
-        $path = $this->routingService->removeHeadingSlash($path);
+        $uriPath = $this->getRoutingService()->removeHeadingSlash($uriPath);
+        $path = $this->getRoutingService()->removeHeadingSlash($path);
 
         // Remove begin
         $uriElements = explode('/', $uriPath);
@@ -287,7 +288,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
      */
     protected function retrievePageInformation(UriInterface $uri, Site $site): array
     {
-        $path = $this->routingService->stripLanguagePrefixFromPath(
+        $path = $this->getRoutingService()->stripLanguagePrefixFromPath(
             $this->language,
             $uri->getPath()
         );

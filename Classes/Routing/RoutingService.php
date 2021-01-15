@@ -194,6 +194,7 @@ class RoutingService implements LoggerAwareInterface
         if (!$this->shouldMaskQueryParameter()) {
             return $queryParams;
         }
+
         /*
          * The array $queryParameterMap contains the mapping of
          * facet name to new url name. In order to unmask we need to switch key and values.
