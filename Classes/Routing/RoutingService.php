@@ -16,6 +16,7 @@ declare(strict_types=1);
 
 namespace ApacheSolrForTypo3\Solr\Routing;
 
+use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Message\UriInterface;
 use Psr\Log\LoggerAwareInterface;
 use Psr\Log\LoggerAwareTrait;
@@ -816,6 +817,97 @@ class RoutingService implements LoggerAwareInterface
         }
 
         return $language;
+    }
+
+    /**
+     * Enrich the current query Params with data from path information
+     *
+     * @param ServerRequestInterface $request
+     * @param array $arguments
+     * @param array $parameters
+     * @return ServerRequestInterface
+     */
+    public function addPathArgumentsToQuery(
+        ServerRequestInterface $request,
+        array $arguments,
+        array $parameters
+    ): ServerRequestInterface {
+        $queryParams = $request->getQueryParams();
+        foreach ($arguments as $fieldName => $queryPath) {
+            // Skip if there is no parameter
+            if (!isset($parameters[$fieldName])) {
+                continue;
+            }
+            $pathElements = explode('/', $queryPath);
+
+            if (!empty($this->pluginNamespace)) {
+                array_unshift($pathElements, $this->pluginNamespace);
+            }
+
+            $queryParams = $this->processUriPathArgument(
+                $queryParams,
+                $fieldName,
+                $parameters,
+                $pathElements
+            );
+        }
+
+        return $request->withQueryParams($queryParams);
+    }
+
+    /**
+     * Converts path segment information into query parameters
+     *
+     * Example:
+     * /products/household
+     *
+     * tx_solr:
+     *      filter:
+     *          - type:household
+     *
+     * @param array $queryParams
+     * @param string $fieldName
+     * @param array $parameters
+     * @param array $pathElements
+     * @return array
+     */
+    protected function processUriPathArgument(
+        array $queryParams,
+        string $fieldName,
+        array $parameters,
+        array $pathElements
+    ): array {
+        $queryKey = array_shift($pathElements);
+        $queryKey = (string)$queryKey;
+
+        $tmpQueryKey = $queryKey;
+        if (strpos($queryKey, '-') !== false) {
+            [$tmpQueryKey, $filterName] = explode('-', $tmpQueryKey, 2);
+        }
+        if (!isset($queryParams[$tmpQueryKey]) || $queryParams[$tmpQueryKey] === null) {
+            $queryParams[$tmpQueryKey] = [];
+        }
+
+        if (strpos($queryKey, '-') !== false) {
+            [$queryKey, $filterName] = explode('-', $queryKey, 2);
+            // explode multiple values
+            $values = $this->pathFacetStringToArray($parameters[$fieldName]);
+            sort($values);
+
+            // @TODO: Support URL data bag
+            foreach ($values as $value) {
+                $queryParams[$queryKey][] = $filterName . ':' . $value;
+            }
+        } else {
+            $queryParams[$queryKey] = $this->processUriPathArgument(
+                $queryParams[$queryKey],
+                $fieldName,
+                $parameters,
+                $pathElements
+            );
+        }
+
+        return $queryParams;
     }
 
     /**

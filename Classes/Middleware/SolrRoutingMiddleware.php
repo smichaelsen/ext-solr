@@ -130,26 +130,23 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         /*
          * Take slug path segments and argument from incoming URI
          */
-        [$slug, $parameters] = $this->getSlugAndParameters(
+        [$slug, $parameters] = $this->extractParametersFromUriPath(
             $request->getUri(),
             $enhancerConfiguration['routePath'],
             (string)$page['slug']
         );
 
-
-        // No parameter exists -> Skip
-        if (count($parameters) === 0) {
-            return $handler->handle($request);
+        /*
+         * Convert path arguments to query arguments
+         */
+        if (!empty($parameters)) {
+            $request = $this->routingService->addPathArgumentsToQuery(
+                $request,
+                $enhancerConfiguration['_arguments'],
+                $parameters
+            );
         }
 
-        /*
-         * Map arguments against the argument configuration
-         */
-        $request = $this->enrichQueryByPathArguments(
-            $request,
-            $enhancerConfiguration['_arguments'],
-            $parameters
-        );
         /*
          * Replace internal URI with existing site taken from path information
          * We removed a possible path segment from the slug, that again needs to attach.
@@ -162,6 +159,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         );
         $request = $request->withUri($uri);
         $queryParams = $request->getQueryParams();
+
         $queryParams = $this->routingService->unmaskQueryParameters($queryParams);
         $queryParams = $this->routingService->inflateQueryParameter($queryParams);
         $request = $request->withQueryParams($queryParams);
@@ -211,7 +209,7 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
      * @param string $pageSlug
      * @return array
      */
-    protected function getSlugAndParameters(UriInterface $uri, string $path, string $pageSlug): array
+    protected function extractParametersFromUriPath(UriInterface $uri, string $path, string $pageSlug): array
     {
         // URI get path returns the path with given language parameter
         // The parameter pageSlug itself does not contains the language parameter.
@@ -234,20 +232,17 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         }
 
         // Take care the format of configuration and given slug equals
-        $uriPath = $this->routingService->addHeadingSlash($uriPath);
-        $path = $this->routingService->addHeadingSlash($path);
         $uriPath = $this->routingService->removeHeadingSlash($uriPath);
         $path = $this->routingService->removeHeadingSlash($path);
 
         // Remove begin
-
         $uriElements = explode('/', $uriPath);
         $routeElements = explode('/', $path);
         $slugElements = [];
         $arguments = [];
         $process = true;
         /*
-         * Extract the slug elements, until the the amount of
+         * Extract the slug elements, until the the amount of route elements reached
          */
         do {
             if (count($uriElements) > count($routeElements)) {
@@ -260,9 +255,17 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
         if (empty($routeElements[0])) {
             array_shift($routeElements);
         }
+        if (empty($uriElements[0])) {
+            array_shift($uriElements);
+        }
 
         // Extract the values
         for ($i = 0; $i < count($uriElements); $i++) {
+            // Skip empty elements
+            if (empty($uriElements[$i])) {
+                continue;
+            }
+
             $key = substr($routeElements[$i], 1, strlen($routeElements[$i]) - 1);
             $key = substr($key, 0, strlen($key) - 1);
 
@@ -273,91 +276,6 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
             implode('/', $slugElements),
             $arguments
         ];
-    }
-
-    /**
-     * Enrich the current query Params with data from path information
-     *
-     * @param ServerRequestInterface $request
-     * @param array $arguments
-     * @param array $parameters
-     * @return ServerRequestInterface
-     */
-    protected function enrichQueryByPathArguments(
-        ServerRequestInterface $request,
-        array $arguments,
-        array $parameters
-    ): ServerRequestInterface {
-        $queryParams = $request->getQueryParams();
-        foreach ($arguments as $fieldName => $queryPath) {
-            // Skip if there is no parameter
-            if (!isset($parameters[$fieldName])) {
-                continue;
-            }
-            $pathElements = explode('/', $queryPath);
-
-            if (!empty($this->namespace)) {
-                array_unshift($pathElements, $this->namespace);
-            }
-
-            $queryParams = $this->processUriPathArgument(
-                $queryParams,
-                $fieldName,
-                $parameters,
-                $pathElements
-            );
-        }
-
-        return $request->withQueryParams($queryParams);
-    }
-
-    /**
-     * Converts path segment information into query parameters
-     *
-     * Example:
-     * /products/household
-     *
-     * tx_solr:
-     *      filter:
-     *          - type:household
-     *
-     * @param array $queryParams
-     * @param string $fieldName
-     * @param array $parameters
-     * @param array $pathElements
-     * @return array
-     */
-    protected function processUriPathArgument(
-        array $queryParams,
-        string $fieldName,
-        array $parameters,
-        array $pathElements
-    ): array {
-        $queryKey = array_shift($pathElements);
-
-        if (!isset($queryParams[$queryKey]) || $queryParams[$queryKey] === null) {
-            $queryParams[$queryKey] = [];
-        }
-
-        if (strpos($queryKey, '-') !== false) {
-            [$queryKey, $filterName] = explode('-', $queryKey, 2);
-            // explode multiple values
-            $values = $this->getRoutingService()->pathFacetStringToArray($parameters[$fieldName]);
-
-            // @TODO: Support URL data bag
-            foreach ($values as $value) {
-                $queryParams[$queryKey][] = $filterName . ':' . $value;
-            }
-        } else {
-            $queryParams[$queryKey] = $this->processUriPathArgument(
-                $queryParams[$queryKey],
-                $fieldName,
-                $parameters,
-                $pathElements
-            );
-        }
-
-        return $queryParams;
     }
 
     /**

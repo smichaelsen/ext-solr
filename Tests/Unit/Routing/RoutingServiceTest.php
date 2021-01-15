@@ -20,6 +20,7 @@ use ApacheSolrForTypo3\Solr\Routing\RoutingService;
 use ApacheSolrForTypo3\Solr\Tests\Unit\UnitTest;
 use Psr\Log\NullLogger;
 use Symfony\Component\Yaml\Yaml;
+use TYPO3\CMS\Core\Http\ServerRequest;
 use TYPO3\CMS\Core\Http\Uri;
 use TYPO3\CMS\Core\Site\Entity\Site;
 
@@ -382,6 +383,68 @@ class RoutingServiceTest extends UnitTest
         $this->assertEquals(
             $expectedResult,
             $routingService->inflateQueryParameter($queryParameters)
+        );
+    }
+
+    /**
+     * @test
+     * @covers \ApacheSolrForTypo3\Solr\Routing\RoutingService::addPathArgumentsToQuery
+     */
+    public function testIfPathParametersMovedInfoQueryParameters()
+    {
+        $uri = new Uri('http://domain.example/');
+        $request = new ServerRequest(
+            $uri
+        );
+        $routingService = $this->getRoutingService();
+        $newRequest = $routingService->addPathArgumentsToQuery(
+            $request,
+            [
+                'color' => 'filter-colorType'
+            ],
+            [
+                'color' => 'blue'
+            ]
+        );
+
+        $this->assertEquals(
+            [
+                'tx_solr' => [
+                    'filter' => ['colorType:blue']
+                ]
+            ],
+            $newRequest->getQueryParams()
+        );
+    }
+
+    /**
+     * @test
+     * @covers \ApacheSolrForTypo3\Solr\Routing\RoutingService::addPathArgumentsToQuery
+     */
+    public function testIfMultiplePathParametersMovedInfoQueryParameters()
+    {
+        $uri = new Uri('http://domain.example/');
+        $request = new ServerRequest(
+            $uri
+        );
+        $routingService = $this->getRoutingService();
+        $newRequest = $routingService->addPathArgumentsToQuery(
+            $request,
+            [
+                'color' => 'filter-colorType'
+            ],
+            [
+                'color' => 'green,blue'
+            ]
+        );
+
+        $this->assertEquals(
+            [
+                'tx_solr' => [
+                    'filter' => ['colorType:blue','colorType:green']
+                ]
+            ],
+            $newRequest->getQueryParams()
         );
     }
 }
