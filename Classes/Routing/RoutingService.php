@@ -605,6 +605,36 @@ class RoutingService implements LoggerAwareInterface
     }
 
     /**
+     * Add heading slash to given slug
+     *
+     * @param string $slug
+     * @return string
+     */
+    public function addHeadingSlash(string $slug): string
+    {
+        if (mb_substr($slug, 0, 1) === '/') {
+            return $slug;
+        }
+
+        return '/' . $slug;
+    }
+
+    /**
+     * Remove heading slash from given slug
+     *
+     * @param string $slug
+     * @return string
+     */
+    public function removeHeadingSlash(string $slug): string
+    {
+        if (mb_substr($slug, 0, 1) !== '/') {
+            return $slug;
+        }
+
+        return mb_substr($slug, 1, mb_strlen($slug) - 1);
+    }
+
+    /**
      * Retrieve the site configuration by URI
      *
      * @param UriInterface $uri

@@ -227,13 +227,30 @@ class SolrRoutingMiddleware implements MiddlewareInterface, LoggerAwareInterface
             ];
         }
 
+        // Remove slug from URI path in order the ensure only the arguments left
+        if (mb_substr($uriPath, 0, mb_strlen($pageSlug) + 1) === $pageSlug . '/') {
+            $length = mb_strlen($pageSlug) + 1;
+            $uriPath = mb_substr($uriPath, $length, mb_strlen($uriPath) - $length);
+        }
+
+        // Take care the format of configuration and given slug equals
+        $uriPath = $this->routingService->addHeadingSlash($uriPath);
+        $path = $this->routingService->addHeadingSlash($path);
+        $uriPath = $this->routingService->removeHeadingSlash($uriPath);
+        $path = $this->routingService->removeHeadingSlash($path);
+
+        // Remove begin
+
         $uriElements = explode('/', $uriPath);
         $routeElements = explode('/', $path);
         $slugElements = [];
         $arguments = [];
         $process = true;
+        /*
+         * Extract the slug elements, until the the amount of
+         */
         do {
-            if (count($uriElements) >= count($routeElements)) {
+            if (count($uriElements) > count($routeElements)) {
                 $slugElements[] = array_shift($uriElements);
             } else {
                 $process = false;
